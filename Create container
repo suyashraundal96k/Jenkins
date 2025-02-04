@@ -1,0 +1,53 @@
+#Create jenkins container
+docker run -d --name jenkins -v /home/ec2-user/jenkinsvolume:/var/jenkins_home -v /var/run/docker.sock:/var/run/docker.sock -p8080:8080          jenkins/jenkins
+
+docker run -d   --name jenkins   -v /home/ec2-user/jenkinsvolume:/var/jenkins_home   -v /var/run/docker.sock:/var/run/docker.sock   -v /usr/bin/docker:/usr/bin/docker   -p 8080:8080   jenkins/jenkins:lts
+
+ls -l /var/run/docker.sock
+
+sudo chmod 666 /var/run/docker.sock
+
+sudo chmod 666 /var/run/docker.sock
+
+docker run -d   --name jenkins   -v /home/ec2-user/jenkinsvolume:/var/jenkins_home   -v /var/run/docker.sock:/var/run/docker.sock   -v /usr/bin/docker:/usr/bin/docker   -p 8080:8080   jenkins/jenkins:lts
+
+#docker container testing in jenkins
+docker stop nodecontainer |true
+docker rm nodecontainer |true
+docker run -d -p80:3000 --name nodecontainer nodeimg
+
+max_attempts=10
+current_attempt=0
+
+while [ $current_attempt -lt $max_attempts ]; do
+    # Capture the container status
+    container_status=$(docker ps --format "{{.Names}}: {{.Status}}" | grep 'nodecontainer' | awk -F': ' '{print $2}')
+
+    # Check if the container status starts with "Up"
+    if echo "$container_status" | grep -q "^Up"; then
+        echo "Container 'nodecontainer' is running successfully!"
+        break
+    else
+        echo "Attempt $((current_attempt + 1)): Container is not running. Retrying..."
+        sleep 3
+        current_attempt=$((current_attempt + 1))
+    fi
+done
+
+if [ $current_attempt -eq $max_attempts ]; then
+    echo "Container 'nodecontainer' did not start within $max_attempts attempts."
+    exit 1
+fi
+ 
+
+ #in Deploy first Build step
+ docker build -t nodeimg .
+docker login -u  devopsbaby -p [token id]
+docker tag nodeimg devopsbaby/dockernode
+docker push devopsbaby/dockernode
+
+#execute shell script on remote using ssh - another build step
+sudo docker pull devopsbaby/dockernode
+sudo docker stop nodecontainer | true
+sudo docker rm nodecontainer | true
+sudo docker run -d -p80:3000 --name nodecontainer  devopsbaby/dockernode
